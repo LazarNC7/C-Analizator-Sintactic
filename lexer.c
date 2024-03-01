@@ -4,6 +4,7 @@
 #include <regex.h>
 #include "lexer.h"
 #include "utils.h"
+#include <math.h>
 #include <stdlib.h>
 
 Token *tokens; // single linked list of tokens
@@ -44,78 +45,9 @@ char *extract(const char *begin, const char *end)
     return text;
 }
 
-void regexCheck(const char *pch)
-{
-    regex_t regex;
-    int reti;
 
-    const char *int_pattern = "[0-9]+";
-    const char *double_pattern = "[0-9]+ ( '.' [0-9]+ ( [eE] [+-]? [0-9]+ )? | ( '.' [0-9]+ )? [eE] [+-]? [0-9]+ )";
-    const char *char_pattern = "['] [^'] [']";
-    const char *string_pattern = "\"[^\"]*\"";
 
-    reti = regcomp(&regex, int_pattern, REG_EXTENDED);
-    if (reti)
-    {
-        fprintf(stderr, "Could not compile regex for INT\n");
-        exit(EXIT_FAILURE);
-    }
 
-    reti = regexec(&regex, pch, 0, NULL, 0);
-    if (!reti)
-    {
-        addTk(INT);
-    }
-    else
-    {
-
-        reti = regcomp(&regex, double_pattern, REG_EXTENDED);
-        if (reti)
-        {
-            fprintf(stderr, "Could not compile regex for DOUBLE\n");
-            exit(EXIT_FAILURE);
-        }
-        reti = regexec(&regex, pch, 0, NULL, 0);
-        if (!reti)
-        {
-            addTk(DOUBLE);
-        }
-        else
-        {
-
-            reti = regcomp(&regex, char_pattern, REG_EXTENDED);
-            if (reti)
-            {
-                fprintf(stderr, "Could not compile regex for CHAR\n");
-                exit(EXIT_FAILURE);
-            }
-            reti = regexec(&regex, pch, 0, NULL, 0);
-            if (!reti)
-            {
-                addTk(CHAR);
-            }
-            else
-            {
-
-                reti = regcomp(&regex, string_pattern, REG_EXTENDED);
-                if (reti)
-                {
-                    fprintf(stderr, "Could not compile regex for STRING\n");
-                    exit(EXIT_FAILURE);
-                }
-                reti = regexec(&regex, pch, 0, NULL, 0);
-                if (!reti)
-                {
-                    addTk(STRING);
-                }
-                else
-                {
-                    err("invalid char: %c (%d)", *pch, *pch);
-                }
-            }
-        }
-    }
-}
 Token *tokenize(const char *pch)
 {
     // printf("1\n");
@@ -206,7 +138,7 @@ Token *tokenize(const char *pch)
         }
         case '*':
         {
-            addTk(SUB);
+            addTk(MUL);
             pch++;
             break;
         }
@@ -315,6 +247,7 @@ Token *tokenize(const char *pch)
                     addTk(VOID);
                 else if (strcmp(text, "while") == 0)
                     addTk(WHILE);
+                
                 else
                 {
                     tk = addTk(ID);
@@ -323,12 +256,63 @@ Token *tokenize(const char *pch)
             }
             else
             {
-                regexCheck(pch);
-                pch++;
+                if (*pch == '\'') {
+        //printf("CHAR\n");
+        tk=addTk(CHAR);
+        pch++;
+        int index=0;
+        char val;
+        while (*pch != '\''){
+            val=*pch;
+            pch++;
+            index++;
+            
+        }
+        if(index!=1) err("The char value is not a string\n");
+            pch++;
+            tk->c=val;
+    } else if (*pch == '"') {
+        //printf("STRING\n");
+        char* val=(char*)malloc(100*sizeof(char));
+        tk=addTk(STRING);
+        
+        pch++;
+        int i=0;
+        while (*pch != '"'){
+            val[i++]=*pch;
+            pch++;
+        }
+            pch++;
+            
+            val[i]='\0';
+            tk->text=val;
+            printf("%s\n", tk->text);
+    } else {
+        //printf("INT/DOUBLE\n");
+        char *endptr;
+        char *endptri;
+        double f = strtod(pch, &endptr);
+        int i=strtol(pch,&endptri,10);
+        //printf("%f\n",f);
+        if (endptr != pch) {
+            if (endptr!=endptri){
+                tk=addTk(DOUBLE);
+                tk->d=f;
+            }
+            else{
+                tk=addTk(INT);
+                tk->i=i;
+            }
+            pch = endptr;
             }
         }
-        }
+   }
+    
     }
+        
+    }
+}
+    
 }
 
 void showTokens(const Token *tokens)
@@ -345,6 +329,15 @@ void showTokens(const Token *tokens)
         "INT", "DOUBLE", "CHAR", "STRING"};
     for (const Token *tk = tokens; tk; tk = tk->next)
     {
-        printf("%d %s\n", tk->line, tokenStrings[tk->code]);
+        
+        printf("%d %s", tk->line, tokenStrings[tk->code]);
+        switch(tk->code){
+            case 0:printf(":%s\n", tk->text); break;
+            case 34: printf(":%d\n", tk->i);break;
+            case 35:printf(":%f\n", tk->d);break;
+            case 36:printf(":'%c'\n", tk->c); break;
+            case 37: printf(":\"%s\"\n", tk->text); break;
+            default: printf("\n");
+        }
     }
 }
